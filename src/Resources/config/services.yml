@@ -4,7 +4,6 @@ services:
         arguments:
             $clients: ['@http_client']
             $souinBaseHost: '%souin_api_platform.base.host%'
-            $souinBaseUrl: '%souin_api_platform.base.url%'
             $souinBaseApiPath: '%souin_api_platform.base.api_path%'
             $souinApiSouinPath: '%souin_api_platform.api.souin.path%'
             $souinApiAuthenticationPath: '%souin_api_platform.api.authentication.path%'

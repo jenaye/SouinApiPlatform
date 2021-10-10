@@ -20,8 +20,8 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final class SouinRegexPurger implements PurgerInterface
 {
-    private const MAX_URL_SIZE_PER_BATCH = 1500;
-    private const SEPARATOR = '&ykey=';
+    private const MAX_HEADER_SIZE_PER_BATCH = 1500;
+    private const SEPARATOR = ', ';
     private const SOUIN_COOKIE_NAME = 'souin-authorization-token';
 
     private $logger;
@@ -38,7 +38,6 @@ final class SouinRegexPurger implements PurgerInterface
     private $souinApiSouinPath;
     private $souinBaseApiPath;
     private $souinBaseHost;
-    private $souinBaseUrl;
 
     // User token dynamically assigned
     private $token;
@@ -46,7 +45,6 @@ final class SouinRegexPurger implements PurgerInterface
     /**
      * @param ClientInterface[] $clients
      * @param string $souinBaseHost
-     * @param string $souinBaseUrl
      * @param string $souinBaseApiPath
      * @param string $souinApiSouinPath
      * @param string $souinApiAuthenticationPath
@@ -57,7 +55,6 @@ final class SouinRegexPurger implements PurgerInterface
     public function __construct(
         array $clients,
         string $souinBaseHost,
-        string $souinBaseUrl,
         string $souinBaseApiPath,
         string $souinApiSouinPath,
         string $souinApiAuthenticationPath,
@@ -69,7 +66,6 @@ final class SouinRegexPurger implements PurgerInterface
         $this->clients = $clients;
         $this->password = $password;
         $this->souinBaseHost = $souinBaseHost;
-        $this->souinBaseUrl = $souinBaseUrl;
         $this->souinBaseApiPath = $souinBaseApiPath;
         $this->souinApiSouinPath = $souinApiSouinPath;
         $this->souinApiAuthenticationPath = $souinApiAuthenticationPath;
@@ -79,7 +75,7 @@ final class SouinRegexPurger implements PurgerInterface
 
     private function getBaseUrl(): string
     {
-        return $this->souinBaseUrl . $this->souinBaseApiPath;
+        return $this->souinBaseHost . $this->souinBaseApiPath;
     }
 
     private function getSouinApiUrl(): string
@@ -94,20 +90,20 @@ final class SouinRegexPurger implements PurgerInterface
 
     private function getParametersFromIris(array $iris): string
     {
-        return \sprintf('?ykey=%s', implode(self::SEPARATOR, $iris));
+        return \implode(self::SEPARATOR, $iris);
     }
 
     private function login(): void
     {
         if ($this->username && $this->password) {
             try {
+                $this->logger->info($this->getSouinAuthenticationUrl() . '/login');
                 $response = $this->clients[0]->request(
                     Request::METHOD_POST,
                     $this->getSouinAuthenticationUrl() . '/login',
                     [
                         'headers' => [
                             'Content-Type' => 'application/json',
-                            'Host' => $this->souinBaseHost,
                         ]
                     ]
                 );
@@ -134,16 +130,19 @@ final class SouinRegexPurger implements PurgerInterface
     private function getChunkedRegex(array $iris): array
     {
         $regex = $this->getParametersFromIris($iris);
+        $this->logger->info($regex);
         $batches = [];
 
-        while (strlen($regex) > self::MAX_URL_SIZE_PER_BATCH) {
-            $splitPosition = strrpos(str_split($regex, self::MAX_URL_SIZE_PER_BATCH)[0], self::SEPARATOR);
+        while (strlen($regex) > self::MAX_HEADER_SIZE_PER_BATCH) {
+            $splitPosition = strrpos(str_split($regex, self::MAX_HEADER_SIZE_PER_BATCH)[0], self::SEPARATOR);
             if ($splitPosition) {
                 [$batches[], $regex] = str_split($regex, $splitPosition);
             }
         }
 
-        return [...$batches, $regex];
+        array_push($batches, $regex);
+
+        return $batches;
     }
 
     private function banRegex(string $regex): void
@@ -152,9 +151,11 @@ final class SouinRegexPurger implements PurgerInterface
             try {
                 $client->request(
                     Request::METHOD_PURGE,
-                    $this->getSouinApiUrl() . $regex,
+                    $this->getSouinApiUrl(),
                     ['headers' => \array_merge(
-                        ['Host' => $this->souinBaseHost],
+                        [
+                            'Surrogate-Keys' => $regex
+                        ],
                         $this->token ?
                             ['Cookie' => sprintf('%s=%s', self::SOUIN_COOKIE_NAME, $this->token)] :
                             []
