@@ -19,6 +19,17 @@ api_platform:
             enabled: true
 ```
 
+Add the bundle into your `bundles.php` file
+```php
+// config/bundles.php
+<?php
+
+return [
+    // previous bundles
+    Darkweak\SouinApiPlatformBundle\SouinApiPlatformBundle::class => ['all' => true],
+];
+```
+
 ### Minimal bundle configuration
 This is the minimal configuration for the SouinApiPlatform bundle.
 ```yaml

@@ -10,3 +10,10 @@ services:
             $username: '%souin_api_platform.api.authentication.username%'
             $password: '%souin_api_platform.api.authentication.password%'
             $logger: '@logger'
+
+    api_platform.http_cache.listener.response.add_tags:
+        class: Darkweak\SouinApiPlatformBundle\HttpCache\EventListener\SouinAddTagsListener
+        arguments:
+            $iriConverter: '@api_platform.iri_converter'
+        tags:
+            - { name: 'kernel.event_listener', event: kernel.response, method: onKernelResponse, priority: -2 }
